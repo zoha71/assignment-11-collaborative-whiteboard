@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Real-Time Collaborative Whiteboard | Canvas & Socket.io</title>
+  <meta name="description" content="High-performance real-time collaborative multi-user whiteboard built with Node.js, Express, Socket.io, and HTML5 Canvas API.">
+  
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header / Top Floating Toolbar -->
+  <header class="top-toolbar glass-panel" id="topToolbar">
+    <!-- Brand & Room Section -->
+    <div class="toolbar-group room-group">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m18 5-3-3H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"></path>
+          <path d="M8 18h1"></path>
+          <path d="M18.4 9.6a2 2 0 1 1 3 3L14 20l-4 1 1-4Z"></path>
+        </svg>
+        <span class="logo-text">CollabBoard</span>
+      </div>
+      <div class="room-badge" id="roomBadge" title="Click to copy room link">
+        <span class="pulse-dot"></span>
+        <span class="room-id-text" id="roomIdDisplay">Room: lobby</span>
+        <button class="icon-btn-mini" id="shareRoomBtn" aria-label="Copy Room URL" title="Copy Room URL">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Drawing Tools & Color Palette -->
+    <div class="toolbar-group tools-group">
+      <!-- Brush / Eraser Toggles -->
+      <div class="tool-toggles">
+        <button class="tool-btn active" id="brushToolBtn" title="Brush Tool (B)" aria-label="Brush Tool">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m18.4 9.6 2 2a2 2 0 1 1-2.8 2.8l-2-2"></path>
+            <path d="m14 14-8.5 8.5a2.12 2.12 0 0 1-3-3L11 11"></path>
+          </svg>
+        </button>
+        <button class="tool-btn" id="eraserToolBtn" title="Eraser Tool (E)" aria-label="Eraser Tool">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path>
+            <path d="M22 21H7"></path>
+            <path d="m5 11 9 9"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Color Swatches & Picker -->
+      <div class="color-palette" id="colorPalette">
+        <button class="color-swatch active" data-color="#1e293b" style="background-color: #1e293b;" title="Slate"></button>
+        <button class="color-swatch" data-color="#ef4444" style="background-color: #ef4444;" title="Crimson Red"></button>
+        <button class="color-swatch" data-color="#f97316" style="background-color: #f97316;" title="Orange"></button>
+        <button class="color-swatch" data-color="#10b981" style="background-color: #10b981;" title="Emerald Green"></button>
+        <button class="color-swatch" data-color="#06b6d4" style="background-color: #06b6d4;" title="Cyan"></button>
+        <button class="color-swatch" data-color="#3b82f6" style="background-color: #3b82f6;" title="Blue"></button>
+        <button class="color-swatch" data-color="#8b5cf6" style="background-color: #8b5cf6;" title="Purple"></button>
+        <button class="color-swatch" data-color="#ec4899" style="background-color: #ec4899;" title="Pink"></button>
+        
+        <label class="custom-color-wrapper" title="Custom Color Picker">
+          <input type="color" id="customColorInput" value="#1e293b" aria-label="Custom Color">
+          <span class="custom-color-icon">+</span>
+        </label>
+      </div>
+
+      <!-- Brush Size Slider -->
+      <div class="brush-size-control">
+        <label for="brushSizeSlider" class="brush-size-label" id="brushSizeLabel">3px</label>
+        <input type="range" id="brushSizeSlider" min="1" max="40" value="3" aria-label="Brush Size">
+      </div>
+    </div>
+
+    <!-- Action Buttons: Undo, Clear, Export -->
+    <div class="toolbar-group actions-group">
+      <button class="action-btn" id="undoBtn" title="Undo Last Stroke (Ctrl+Z)" aria-label="Undo">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 7v6h6"></path>
+          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+        </svg>
+        <span>Undo</span>
+      </button>
+
+      <button class="action-btn danger-btn" id="clearBtn" title="Clear Canvas For Everyone" aria-label="Clear Canvas">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18"></path>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+        </svg>
+        <span>Clear</span>
+      </button>
+
+      <button class="action-btn" id="exportBtn" title="Save Board as PNG Image" aria-label="Export PNG">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export</span>
+      </button>
+    </div>
+
+    <!-- Active Collaborators & User Profile -->
+    <div class="toolbar-group profile-group">
+      <div class="active-users-wrap" id="activeUsersWrap" title="Active Collaborators in Room">
+        <div class="users-avatars-list" id="usersAvatarsList"></div>
+        <span class="users-counter" id="usersCounter">1</span>
+      </div>
+
+      <div class="user-profile-badge" id="userProfileBadge" title="Click to Change Username">
+        <span class="user-color-indicator" id="userColorIndicator"></span>
+        <span class="username-display" id="usernameDisplay">Guest</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Interactive Canvas Container -->
+  <main class="canvas-viewport" id="canvasViewport">
+    <canvas id="whiteboardCanvas"></canvas>
+    <!-- Collaborator Cursors Overlay -->
+    <div class="cursors-overlay" id="cursorsOverlay"></div>
+  </main>
+
+  <!-- Status / Connectivity Bar -->
+  <footer class="status-bar glass-panel" id="statusBar">
+    <div class="status-item connection-status">
+      <span class="status-indicator-dot online" id="connectionDot"></span>
+      <span id="connectionStatusText">Connected (Real-Time WS)</span>
+    </div>
+    <div class="status-item stroke-count-status">
+      <span id="strokeCounterText">Strokes: 0</span>
+    </div>
+    <div class="status-item cursor-coords-status">
+      <span id="cursorCoordsText">X: 0, Y: 0</span>
+    </div>
+  </footer>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- User Name Modal -->
+  <div class="modal-overlay hidden" id="nameModal">
+    <div class="modal-card glass-panel">
+      <h3 class="modal-title">Collaborator Profile</h3>
+      <p class="modal-subtitle">Choose your display name and collaborative color:</p>
+      
+      <div class="modal-input-group">
+        <label for="modalUsernameInput">Display Name</label>
+        <input type="text" id="modalUsernameInput" maxlength="25" placeholder="e.g. Alice">
+      </div>
+
+      <div class="modal-input-group">
+        <label>Pick Avatar Color</label>
+        <div class="modal-colors-grid" id="modalColorsGrid"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="modalSaveBtn">Save & Update</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Socket.io client library (Served directly by the Node server) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="canvas.js"></script>
+</body>
+</html>
